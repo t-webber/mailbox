@@ -2,18 +2,26 @@
 
 use core::result;
 
-use crate::credentials::CredentialsError;
+use crate::{credentials, imap_connection};
 
 /// Errors that may occur while running the app.
 #[derive(Debug)]
 pub enum Error {
+    /// Failure occurred while interaction with the IMAP protocol.
+    ImapError(imap_connection::Error),
     /// `dotenv` failed to read the `.env` file.
-    InvalidCredentials(CredentialsError),
+    InvalidCredentials(credentials::Error),
 }
 
-impl From<CredentialsError> for Error {
-    fn from(value: CredentialsError) -> Self {
-        Self::InvalidCredentials(value)
+impl From<credentials::Error> for Error {
+    fn from(error: credentials::Error) -> Self {
+        Self::InvalidCredentials(error)
+    }
+}
+
+impl From<imap_connection::Error> for Error {
+    fn from(error: imap_connection::Error) -> Self {
+        Self::ImapError(error)
     }
 }
 

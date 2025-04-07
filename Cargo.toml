@@ -9,3 +9,5 @@ repository = "https://github.com/t-webber/mailbox"
 
 [dependencies]
 dotenv = "0.15.0"
+imap = "2.4.1"
+native-tls = "0.2.14"

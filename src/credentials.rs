@@ -21,7 +21,7 @@ use crate::errors::Result;
 #[derive(Debug)]
 pub struct Credentials {
     /// Email domain
-    domain: String,
+    domain_name: String,
     /// Email
     email: String,
     /// Imap encryption protocol
@@ -53,43 +53,60 @@ impl Credentials {
     const PASSWORD: &'static str = "PASSWORD";
 
     /// Returns the domain
-    pub fn as_domain(&self) -> &str {
-        &self.domain
+    pub fn as_domain_name(&self) -> &str {
+        &self.domain_name
+    }
+
+    /// Returns the email
+    pub fn as_email(&self) -> &str {
+        &self.email
+    }
+
+    /// Returns the socket address
+    ///
+    /// A socket address is the combination of a hostname and a port.
+    pub fn as_imap_socket_address(&self) -> (&str, u16) {
+        (&self.domain_name, self.imap_port)
+    }
+
+    /// Returns the password
+    pub fn as_password(&self) -> &str {
+        &self.password
     }
 
     /// Loads the credentials from the `.env` file.
-    pub fn load() -> Result<Self, CredentialsError> {
-        dotenv().map_err(CredentialsError::InvalidFile)?;
+    pub fn load() -> Result<Self, Error> {
+        dotenv().map_err(Error::InvalidFile)?;
 
-        let domain = Self::load_var(Self::DOMAIN)?;
+        let domain_name = Self::load_var(Self::DOMAIN)?;
         let email = Self::load_var(Self::EMAIL)?;
         let imap_port = Self::load_imap_port()?;
         let imap_encryption_protocol = Self::load_var(Self::IMAP_ENCRYPTION_PROTOCOL)?;
         let password = Self::load_var(Self::PASSWORD)?;
 
-        Ok(Self { domain, email, imap_encryption_protocol, imap_port, password })
+        Ok(Self { domain_name, email, imap_encryption_protocol, imap_port, password })
     }
 
     /// Load the imap port from the `.env`
     ///
     /// Port defaults to [`IMAP_PORT_DEFAULT`](Self::IMAP_PORT_DEFAULT) if it is
     /// not specified.
-    fn load_imap_port() -> Result<u16, CredentialsError> {
+    fn load_imap_port() -> Result<u16, Error> {
         Self::load_var(Self::IMAP_PORT).map_or_else(
             |_| Ok(Self::IMAP_PORT_DEFAULT),
-            |value| value.parse().map_err(CredentialsError::InvalidPort),
+            |value| value.parse().map_err(Error::InvalidPort),
         )
     }
 
     /// Loads one variable from the `.env` file.
-    fn load_var(var_key: &'static str) -> Result<String, CredentialsError> {
-        var(var_key).map_err(|err| CredentialsError::MissingVariable(err, var_key))
+    fn load_var(var_key: &'static str) -> Result<String, Error> {
+        var(var_key).map_err(|err| Error::MissingVariable(err, var_key))
     }
 }
 
 /// Errors that may occur while running the app.
 #[derive(Debug)]
-pub enum CredentialsError {
+pub enum Error {
     /// `dotenv` failed to read the `.env` file.
     InvalidFile(dotenv::Error),
     /// The provided IMAP port is invalid

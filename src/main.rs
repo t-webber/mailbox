@@ -35,11 +35,14 @@
 
 mod credentials;
 mod errors;
+mod imap_connection;
 use credentials::Credentials;
 use errors::Result;
+use imap_connection::ImapSession;
 
 #[expect(clippy::dbg_macro, reason = "debugging")]
 fn main() -> Result {
-    dbg!(Credentials::load()?);
+    let credentials = dbg!(Credentials::load()?);
+    let imap_session = ImapSession::with_credentials(&credentials);
     Ok(())
 }
