@@ -2,6 +2,10 @@
 name = "mailbox"
 version = "0.1.0"
 edition = "2024"
+description = "Rust crate to load emails with IMAP protocol and send emails with SMTP protocol."
+authors = ["Tom Webber"]
+license = "MIT or Apache-2.0"
+repository = "https://github.com/t-webber/mailbox"
 
 [dependencies]
 dotenv = "0.15.0"
