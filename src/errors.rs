@@ -1,15 +1,20 @@
 //! Handles errors, with a custom [`Result`] and [`Error`] type
 
-use std::env::VarError;
-use std::result;
+use core::result;
+
+use crate::credentials::CredentialsError;
 
 /// Errors that may occur while running the app.
 #[derive(Debug)]
 pub enum Error {
     /// `dotenv` failed to read the `.env` file.
-    CredentialsInvalidFile(dotenv::Error),
-    /// The wanted variable is missing in the `.env` file.
-    CredentialsMissingVariable(VarError, &'static str),
+    InvalidCredentials(CredentialsError),
+}
+
+impl From<CredentialsError> for Error {
+    fn from(value: CredentialsError) -> Self {
+        Self::InvalidCredentials(value)
+    }
 }
 
 /// Overloaded result for the [`mailbox`](crate) crate
