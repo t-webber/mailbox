@@ -11,6 +11,8 @@ pub enum Error {
     Credentials(credentials::Error),
     /// Failure occurred while interaction with the IMAP protocol.
     ImapConnection(fetch::connection::Error),
+    /// Failure occurred while parsing the email body.
+    Parsing(fetch::parser::Error),
 }
 
 impl From<credentials::Error> for Error {
@@ -22,6 +24,12 @@ impl From<credentials::Error> for Error {
 impl From<fetch::connection::Error> for Error {
     fn from(error: fetch::connection::Error) -> Self {
         Self::ImapConnection(error)
+    }
+}
+
+impl From<fetch::parser::Error> for Error {
+    fn from(error: fetch::parser::Error) -> Self {
+        Self::Parsing(error)
     }
 }
 
