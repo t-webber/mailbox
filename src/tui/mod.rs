@@ -5,7 +5,10 @@ use std::io;
 
 use mail_parser::HeaderName;
 use ratatui::crossterm::event::{read, Event, KeyCode, KeyEvent};
-use ratatui::widgets::{Block, List};
+use ratatui::layout::Alignment;
+use ratatui::text::{Line, Text};
+use ratatui::widgets::block::Title;
+use ratatui::widgets::{Block, BorderType, List, ListItem, Padding};
 use ratatui::Frame;
 
 use crate::credentials::Credentials;
@@ -87,16 +90,34 @@ fn draw_emails(frame: &mut Frame<'_>, emails: &[Email]) -> Result {
     let email_subjects = emails
         .iter()
         .map(|email| {
-            Ok(email
+            let subject = email
                 .get_header(&HeaderName::Subject)?
                 .as_text()
                 .ok_or(parser::Error::InvalidHeaderType)?
-                .to_owned())
+                .to_owned();
+            let date = email
+                .get_header(&HeaderName::Date)?
+                .as_datetime()
+                .ok_or(parser::Error::InvalidHeaderType)?
+                .to_rfc3339();
+            let block = Block::bordered().padding(Padding::uniform(1));
+            let text = Text::from(vec![Line::from(subject), Line::from(date)]);
+            Ok(ListItem::from(text))
         })
         .collect::<Result<Vec<_>>>()?;
-    let emails_list = List::new(email_subjects);
-    let block = emails_list.block(Block::default());
-    frame.render_widget(block, frame.area());
+
+    let subject_list_container = Block::bordered()
+        .title("Recent emails")
+        .border_type(BorderType::Rounded)
+        .title_alignment(Alignment::Center)
+        .padding(Padding::uniform(1));
+
+    let email_subject_list = List::new(email_subjects);
+
+    let widget = email_subject_list.block(subject_list_container);
+
+    frame.render_widget(widget, frame.area());
+
     Ok(())
 }
 
