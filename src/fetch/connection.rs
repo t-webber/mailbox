@@ -5,7 +5,6 @@
 
 use core::marker::PhantomData;
 use core::str::{from_utf8, Utf8Error};
-use std::collections::HashSet;
 use std::net;
 
 use imap::types::Fetch;
@@ -103,6 +102,7 @@ impl ImapSession<MailboxSelected> {
             .into_iter()
             .collect::<Vec<_>>();
         uids.sort_unstable();
+        uids.reverse();
         Ok(uids)
     }
 }

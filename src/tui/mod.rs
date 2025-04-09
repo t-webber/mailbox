@@ -3,8 +3,10 @@
 use core::any::Any;
 use std::io;
 
+use mail_parser::HeaderName;
 use ratatui::crossterm::event::{read, Event, KeyCode, KeyEvent};
 use ratatui::text::Text;
+use ratatui::widgets::{Block, List};
 use ratatui::Frame;
 
 use crate::credentials::Credentials;
@@ -73,9 +75,22 @@ impl Tui {
 }
 
 /// Draws 'Hello world' onto the frame
-fn draw_emails(frame: &mut Frame<'_>, emails: &[Email]) {
-    let text = Text::raw("Hello World");
-    frame.render_widget(text, frame.area());
+fn draw_emails(frame: &mut Frame<'_>, emails: &[Email<'_>]) {
+    let email_subjects = emails
+        .iter()
+        .map(|email| {
+            email
+                .as_headers()
+                .get(&HeaderName::Subject)
+                .unwrap()
+                .as_text()
+                .unwrap()
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    let emails_list = List::new(email_subjects);
+    let block = emails_list.block(Block::default());
+    frame.render_widget(block, frame.area());
 }
 
 /// Errors than occur because of the TUI rendering

@@ -26,7 +26,7 @@ pub struct Email<'body> {
 
 impl Email<'_> {
     /// Returns the headers of the email
-    const fn as_headers(&self) -> &Headers<'_> {
+    pub const fn as_headers(&self) -> &Headers<'_> {
         &self.headers
     }
 }
