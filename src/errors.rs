@@ -2,7 +2,7 @@
 
 use core::result;
 
-use crate::{credentials, fetch};
+use crate::{credentials, fetch, tui};
 
 /// Errors that may occur while running the app.
 #[derive(Debug)]
@@ -13,6 +13,8 @@ pub enum Error {
     ImapConnection(fetch::connection::Error),
     /// Failure occurred while parsing the email body.
     Parsing(fetch::parser::Error),
+    /// Failure occurred after TUI
+    Tui(tui::Error),
 }
 
 impl From<credentials::Error> for Error {
@@ -30,6 +32,12 @@ impl From<fetch::connection::Error> for Error {
 impl From<fetch::parser::Error> for Error {
     fn from(error: fetch::parser::Error) -> Self {
         Self::Parsing(error)
+    }
+}
+
+impl From<tui::Error> for Error {
+    fn from(error: tui::Error) -> Self {
+        Self::Tui(error)
     }
 }
 

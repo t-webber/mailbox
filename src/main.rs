@@ -38,40 +38,8 @@
 mod credentials;
 mod errors;
 mod fetch;
+mod tui;
 
-const fn main() {}
-
-#[cfg(test)]
-mod test {
-
-    use crate::credentials::Credentials;
-    use crate::errors::Result;
-    use crate::fetch::connection::ImapSession;
-
-    #[expect(
-        clippy::panic_in_result_fn,
-        clippy::unwrap_used,
-        reason = "test and system failure"
-    )]
-    #[test]
-    fn check_first_last() -> Result {
-        let credentials = Credentials::load()?;
-        let imap_session = ImapSession::with_credentials(&credentials)?;
-        let mut inbox = imap_session.select_mailbox("INBOX")?;
-
-        let mails = inbox.get_all_mails()?;
-        let first_all = mails.first().unwrap();
-        let last_all = mails.last().unwrap();
-
-        let mut uids = inbox.get_uids()?.into_iter().collect::<Vec<_>>();
-        uids.sort_unstable();
-
-        let first_single = inbox.get_mail_from_uid(*uids.first().unwrap())?;
-        let last_single = inbox.get_mail_from_uid(*uids.last().unwrap())?;
-
-        assert!(first_all == &first_single);
-        assert!(last_all == &last_single);
-
-        Ok(())
-    }
+fn main() -> errors::Result {
+    tui::run()
 }
