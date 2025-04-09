@@ -17,6 +17,8 @@ use crate::errors::Result;
 ///
 /// Handles key events and frame renders
 pub fn run() -> Result {
+    clear_terminal()?;
+
     let mut terminal = ratatui::init();
 
     thread::spawn(key_events);
@@ -32,9 +34,7 @@ fn key_events() -> Result {
     loop {
         match read().map_err(Error::IoKeyboard)? {
             Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => {
-                stdout()
-                    .queue(Clear(ClearType::All))
-                    .map_err(Error::ClearTerminal)?;
+                clear_terminal()?;
                 disable_raw_mode().map_err(Error::DisablingRawMode)?;
                 exit(0);
             }
@@ -46,6 +46,14 @@ fn key_events() -> Result {
             | Event::Resize(..) => (),
         }
     }
+}
+
+/// Clear the whole terminal
+fn clear_terminal() -> Result {
+    stdout()
+        .queue(Clear(ClearType::All))
+        .map_err(Error::ClearTerminal)?;
+    Ok(())
 }
 
 /// Draws 'Hello world' onto the frame
