@@ -42,5 +42,5 @@ mod fetch;
 mod tui;
 
 fn main() -> errors::Result {
-    tui::Tui::new().run()
+    tui::Tui::new()?.run()
 }

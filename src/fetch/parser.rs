@@ -4,18 +4,20 @@ use std::collections::HashMap;
 
 use mail_parser::{HeaderName, HeaderValue, MessageParser};
 
+use crate::errors::Result;
+
 /// Headers of an email
-type Headers<'body> = HashMap<HeaderName<'body>, HeaderValue<'body>>;
+type Headers = HashMap<HeaderName<'static>, HeaderValue<'static>>;
 
 //TODO: this doesn't support nested messages yet. See mail-parser attachments
 // to this extent.
 /// Represents a parsed email
-pub struct Email<'body> {
+pub struct Email {
     /// Headers of the email
     ///
     /// This contains the date, the origin (`from`), the destination (`to`,
     /// `cc`, `bcc`), the subject, etc.
-    headers: Headers<'body>,
+    headers: Headers,
     /// HTML version of the email content
     html: Option<String>,
     /// Plain text version of the email content
@@ -24,14 +26,23 @@ pub struct Email<'body> {
     uid: u32,
 }
 
-impl Email<'_> {
+impl Email {
     /// Returns the headers of the email
-    pub const fn as_headers(&self) -> &Headers<'_> {
+    pub const fn as_headers(&self) -> &Headers {
         &self.headers
+    }
+
+    /// Returns the value of a header
+    pub fn get_header(&self, header_name: &HeaderName<'_>) -> Result<HeaderValue<'_>> {
+        Ok(self
+            .as_headers()
+            .get(header_name)
+            .ok_or(Error::MissingHeader)?
+            .to_owned())
     }
 }
 
-impl<'body> TryFrom<(u32, &'body [u8])> for Email<'body> {
+impl<'body> TryFrom<(u32, &'body [u8])> for Email {
     type Error = Error;
 
     fn try_from((uid, value): (u32, &'body [u8])) -> Result<Self, Error> {
@@ -42,10 +53,10 @@ impl<'body> TryFrom<(u32, &'body [u8])> for Email<'body> {
         let headers = message
             .parts
             .first()
-            .ok_or(Error::NoHeader)?
+            .ok_or(Error::NoHeaders)?
             .headers
             .iter()
-            .map(|header| (header.name.to_owned(), header.value.clone()))
+            .map(|header| (header.name.to_owned(), header.value.clone().into_owned()))
             .collect();
 
         let html = message.body_html(0).map(|html| html.to_string());
@@ -58,10 +69,14 @@ impl<'body> TryFrom<(u32, &'body [u8])> for Email<'body> {
 /// Errors that may occur while parsing the email.
 #[derive(Debug)]
 pub enum Error {
+    /// Given header has the wrong type
+    InvalidHeaderType,
     /// Failed to parse the email.
     ParseFailure,
     /// Failed to get headers from the email.
-    NoHeader,
+    NoHeaders,
+    /// Failed to get the wanted header
+    MissingHeader,
 }
 
 #[cfg(test)]

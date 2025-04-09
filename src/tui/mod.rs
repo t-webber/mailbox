@@ -5,50 +5,58 @@ use std::io;
 
 use mail_parser::HeaderName;
 use ratatui::crossterm::event::{read, Event, KeyCode, KeyEvent};
-use ratatui::text::Text;
 use ratatui::widgets::{Block, List};
 use ratatui::Frame;
 
 use crate::credentials::Credentials;
 use crate::errors::Result;
 use crate::fetch::connection::ImapSession;
-use crate::fetch::parser::Email;
+use crate::fetch::parser::{self, Email};
 
 /// Follows the state of the TUI application.
 #[derive(Default)]
 pub struct Tui {
+    /// Emails that were fetched from the server
+    emails: Vec<Email>,
+    /// Email uids that exist in the INBOX
+    uids: Vec<u32>,
     /// Indicates whether the app is running
     running: bool,
 }
 
 impl Tui {
     /// Creates a new [`Tui`]
-    pub const fn new() -> Self {
-        Self { running: false }
+    pub fn new() -> Result<Self> {
+        let credentials = Credentials::load()?;
+        let mut session = ImapSession::with_credentials(&credentials)?.select_mailbox("INBOX")?;
+        let uids = session.get_uids()?;
+        let first_email_bodies = uids
+            .iter()
+            .take(20)
+            .map(|uid| Ok((uid, session.get_mail_from_uid(*uid)?)))
+            .collect::<Result<Vec<_>>>()?;
+        let first_emails = first_email_bodies
+            .iter()
+            .map(|(uid, body)| Ok(Email::try_from((**uid, body.as_bytes()))?))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Self { running: false, uids, emails: first_emails })
     }
 
     /// Runs the [`Tui`]
     ///
     /// Handles key events and frame renders
+    #[expect(
+        clippy::unwrap_in_result,
+        clippy::unwrap_used,
+        reason = "inside closure"
+    )]
     pub fn run(&mut self) -> Result {
-        let credentials = Credentials::load()?;
-        let mut session = ImapSession::with_credentials(&credentials)?.select_mailbox("INBOX")?;
-        let email_uids = session.get_uids()?;
-        let first_email_bodies = email_uids
-            .into_iter()
-            .take(20)
-            .map(|uid| Ok((uid, session.get_mail_from_uid(uid)?)))
-            .collect::<Result<Vec<_>>>()?;
-        let first_emails = first_email_bodies
-            .iter()
-            .map(|(uid, body)| Ok(Email::try_from((*uid, body.as_bytes()))?))
-            .collect::<Result<Vec<_>>>()?;
-
         let mut terminal = ratatui::init();
         self.running = true;
         while self.running {
             terminal
-                .draw(|frame| draw_emails(frame, &first_emails))
+                .draw(|frame| draw_emails(frame, &self.emails).unwrap())
                 .map_err(Error::Drawing)?;
             self.key_events()?;
         }
@@ -75,22 +83,21 @@ impl Tui {
 }
 
 /// Draws 'Hello world' onto the frame
-fn draw_emails(frame: &mut Frame<'_>, emails: &[Email<'_>]) {
+fn draw_emails(frame: &mut Frame<'_>, emails: &[Email]) -> Result {
     let email_subjects = emails
         .iter()
         .map(|email| {
-            email
-                .as_headers()
-                .get(&HeaderName::Subject)
-                .unwrap()
+            Ok(email
+                .get_header(&HeaderName::Subject)?
                 .as_text()
-                .unwrap()
-                .to_owned()
+                .ok_or(parser::Error::InvalidHeaderType)?
+                .to_owned())
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
     let emails_list = List::new(email_subjects);
     let block = emails_list.block(Block::default());
     frame.render_widget(block, frame.area());
+    Ok(())
 }
 
 /// Errors than occur because of the TUI rendering
