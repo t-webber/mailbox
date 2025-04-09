@@ -34,6 +34,7 @@
 #![expect(clippy::mod_module_files, reason = "chosen style")]
 #![expect(dead_code, reason = "implementation in progress")]
 #![allow(clippy::arbitrary_source_item_ordering, reason = "issue #14570")]
+#![allow(clippy::pattern_type_mismatch, reason = "conveniant")]
 
 mod credentials;
 mod errors;
@@ -41,5 +42,5 @@ mod fetch;
 mod tui;
 
 fn main() -> errors::Result {
-    tui::run()
+    tui::Tui::new().run()
 }

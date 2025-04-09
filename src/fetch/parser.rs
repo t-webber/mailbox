@@ -21,7 +21,7 @@ pub struct Email<'body> {
     /// Plain text version of the email content
     text: Option<String>,
     /// Unique ID corresponding to the email
-    uid: u64,
+    uid: u32,
 }
 
 impl Email<'_> {
@@ -31,10 +31,10 @@ impl Email<'_> {
     }
 }
 
-impl<'body> TryFrom<(u64, &'body [u8])> for Email<'body> {
+impl<'body> TryFrom<(u32, &'body [u8])> for Email<'body> {
     type Error = Error;
 
-    fn try_from((uid, value): (u64, &'body [u8])) -> Result<Self, Error> {
+    fn try_from((uid, value): (u32, &'body [u8])) -> Result<Self, Error> {
         let message = MessageParser::default()
             .parse(value)
             .ok_or(Error::ParseFailure)?;

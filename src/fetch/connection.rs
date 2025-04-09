@@ -4,7 +4,7 @@
 //! [`mailbox`](crate) to read the emails.
 
 use core::marker::PhantomData;
-use core::str::{Utf8Error, from_utf8};
+use core::str::{from_utf8, Utf8Error};
 use std::collections::HashSet;
 use std::net;
 
@@ -95,8 +95,15 @@ impl ImapSession<MailboxSelected> {
     }
 
     /// Returns the body of the latest email in the `INBOX` folder.
-    pub fn get_uids(&mut self) -> Result<HashSet<u32>> {
-        Ok(self.session.uid_search("ALL").map_err(Error::ImapFetch)?)
+    pub fn get_uids(&mut self) -> Result<Vec<u32>> {
+        let mut uids = self
+            .session
+            .uid_search("ALL")
+            .map_err(Error::ImapFetch)?
+            .into_iter()
+            .collect::<Vec<_>>();
+        uids.sort_unstable();
+        Ok(uids)
     }
 }
 
