@@ -6,8 +6,8 @@ use std::io;
 use mail_parser::HeaderName;
 use ratatui::crossterm::event::{read, Event, KeyCode, KeyEvent};
 use ratatui::layout::Alignment;
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::block::Title;
 use ratatui::widgets::{Block, BorderType, List, ListItem, Padding};
 use ratatui::Frame;
 
@@ -19,6 +19,13 @@ use crate::fetch::parser::{self, Email};
 /// Follows the state of the TUI application.
 #[derive(Default)]
 pub struct Tui {
+    /// Id of the email that is hovered
+    ///
+    /// The id is computed from the most recent recent email (i.e., the latest
+    /// email will be associated to an id of 0. When the list of emails is
+    /// refetched from the server, this id must be synchronised to be
+    /// coherent with the new email list.
+    current_id: usize,
     /// Emails that were fetched from the server
     emails: Vec<Email>,
     /// Email uids that exist in the INBOX
@@ -43,7 +50,7 @@ impl Tui {
             .map(|(uid, body)| Ok(Email::try_from((**uid, body.as_bytes()))?))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(Self { running: false, uids, emails: first_emails })
+        Ok(Self { running: false, uids, emails: first_emails, current_id: 0 })
     }
 
     /// Runs the [`Tui`]
@@ -59,7 +66,7 @@ impl Tui {
         self.running = true;
         while self.running {
             terminal
-                .draw(|frame| draw_emails(frame, &self.emails).unwrap())
+                .draw(|frame| self.draw_emails(frame).unwrap())
                 .map_err(Error::Drawing)?;
             self.key_events()?;
         }
@@ -83,42 +90,48 @@ impl Tui {
         }
         Ok(())
     }
-}
 
-/// Draws 'Hello world' onto the frame
-fn draw_emails(frame: &mut Frame<'_>, emails: &[Email]) -> Result {
-    let email_subjects = emails
-        .iter()
-        .map(|email| {
-            let subject = email
-                .get_header(&HeaderName::Subject)?
-                .as_text()
-                .ok_or(parser::Error::InvalidHeaderType)?
-                .to_owned();
-            let date = email
-                .get_header(&HeaderName::Date)?
-                .as_datetime()
-                .ok_or(parser::Error::InvalidHeaderType)?
-                .to_rfc3339();
-            let block = Block::bordered().padding(Padding::uniform(1));
-            let text = Text::from(vec![Line::from(subject), Line::from(date)]);
-            Ok(ListItem::from(text))
-        })
-        .collect::<Result<Vec<_>>>()?;
+    /// Draws 'Hello world' onto the frame
+    fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
+        let email_subjects = self
+            .emails
+            .iter()
+            .enumerate()
+            .map(|(id, email)| {
+                let subject = email
+                    .get_header(&HeaderName::Subject)?
+                    .as_text()
+                    .ok_or(parser::Error::InvalidHeaderType)?
+                    .to_owned();
+                let date = email
+                    .get_header(&HeaderName::Date)?
+                    .as_datetime()
+                    .ok_or(parser::Error::InvalidHeaderType)?
+                    .to_rfc3339();
+                let raw_text = Text::from(vec![Line::from(subject), Line::from(date)]);
+                let styled_text = if self.current_id == id {
+                    raw_text.style(Style::new().bg(Color::Green))
+                } else {
+                    raw_text
+                };
+                Ok(ListItem::from(styled_text))
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-    let subject_list_container = Block::bordered()
-        .title("Recent emails")
-        .border_type(BorderType::Rounded)
-        .title_alignment(Alignment::Center)
-        .padding(Padding::uniform(1));
+        let subject_list_container = Block::bordered()
+            .title("Recent emails")
+            .border_type(BorderType::Rounded)
+            .title_alignment(Alignment::Center)
+            .padding(Padding::uniform(1));
 
-    let email_subject_list = List::new(email_subjects);
+        let email_subject_list = List::new(email_subjects);
 
-    let widget = email_subject_list.block(subject_list_container);
+        let widget = email_subject_list.block(subject_list_container);
 
-    frame.render_widget(widget, frame.area());
+        frame.render_widget(widget, frame.area());
 
-    Ok(())
+        Ok(())
+    }
 }
 
 /// Errors than occur because of the TUI rendering
