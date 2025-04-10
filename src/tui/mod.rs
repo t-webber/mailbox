@@ -81,8 +81,12 @@ impl Tui {
             Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => {
                 self.running = false;
             }
-            Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) =>
-                self.current_id = self.current_id.saturating_add(1),
+            Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
+                let incremented = self.current_id.saturating_add(1);
+                if incremented < self.emails.len() {
+                    self.current_id = incremented;
+                }
+            }
             Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) =>
                 self.current_id = self.current_id.saturating_sub(1),
             Event::Key(_)
@@ -125,9 +129,7 @@ impl Tui {
         let subject_list_container = Block::bordered()
             .title("Recent emails")
             .border_type(BorderType::Rounded)
-            .title_alignment(Alignment::Center)
-            .padding(Padding::uniform(1));
-
+            .title_alignment(Alignment::Center);
         let email_subject_list = List::new(email_subjects);
 
         let widget = email_subject_list.block(subject_list_container);
