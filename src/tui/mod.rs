@@ -81,6 +81,10 @@ impl Tui {
             Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => {
                 self.running = false;
             }
+            Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) =>
+                self.current_id = self.current_id.saturating_add(1),
+            Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) =>
+                self.current_id = self.current_id.saturating_sub(1),
             Event::Key(_)
             | Event::FocusGained
             | Event::FocusLost
