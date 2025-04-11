@@ -101,6 +101,7 @@ impl Tui {
     }
 
     /// Draws 'Hello world' onto the frame
+    #[expect(clippy::missing_asserts_for_indexing, reason = "manual check")]
     fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
         let email_subjects = self
             .emails
@@ -138,8 +139,12 @@ impl Tui {
         let other = Block::bordered().title("Email display");
 
         let layout =
-            Layout::new(Direction::Vertical, [Constraint::Length(10), Constraint::Length(10)])
-                .split(Rect::new(0, 0, 10, 10));
+            Layout::new(Direction::Horizontal, [Constraint::Fill(10), Constraint::Fill(10)])
+                .split(Rect::new(0, 0, frame.area().width, frame.area().height));
+
+        if layout.len() != 2 {
+            return Err(Error::LayoutFailure.into());
+        }
 
         frame.render_widget(email_finder, layout[0]);
         frame.render_widget(other, layout[1]);
@@ -161,6 +166,8 @@ pub enum Error {
     Drawing(io::Error),
     /// Error occurred while reading the keyboard presses.
     IoKeyboard(io::Error),
+    /// Failed to create the layout
+    LayoutFailure,
     /// Error occurred while spawning keyboard listener thread.
     UnknownKeyboard(Box<dyn Any + Send>),
 }
