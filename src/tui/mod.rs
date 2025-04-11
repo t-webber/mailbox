@@ -4,12 +4,12 @@ use core::any::Any;
 use std::io;
 
 use mail_parser::HeaderName;
-use ratatui::crossterm::event::{read, Event, KeyCode, KeyEvent};
-use ratatui::layout::Alignment;
+use ratatui::Frame;
+use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, read};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, BorderType, List, ListItem, Padding};
-use ratatui::Frame;
+use ratatui::widgets::{Block, BorderType, List, ListItem};
 
 use crate::credentials::Credentials;
 use crate::errors::Result;
@@ -87,8 +87,9 @@ impl Tui {
                     self.current_id = incremented;
                 }
             }
-            Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) =>
-                self.current_id = self.current_id.saturating_sub(1),
+            Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
+                self.current_id = self.current_id.saturating_sub(1)
+            }
             Event::Key(_)
             | Event::FocusGained
             | Event::FocusLost
@@ -132,9 +133,16 @@ impl Tui {
             .title_alignment(Alignment::Center);
         let email_subject_list = List::new(email_subjects);
 
-        let widget = email_subject_list.block(subject_list_container);
+        let email_finder = email_subject_list.block(subject_list_container);
 
-        frame.render_widget(widget, frame.area());
+        let other = Block::bordered().title("Email display");
+
+        let layout =
+            Layout::new(Direction::Vertical, [Constraint::Length(10), Constraint::Length(10)])
+                .split(Rect::new(0, 0, 10, 10));
+
+        frame.render_widget(email_finder, layout[0]);
+        frame.render_widget(other, layout[1]);
 
         Ok(())
     }
