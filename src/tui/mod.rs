@@ -101,7 +101,11 @@ impl Tui {
     }
 
     /// Draws 'Hello world' onto the frame
-    #[expect(clippy::missing_asserts_for_indexing, reason = "manual check")]
+    #[expect(
+        clippy::missing_asserts_for_indexing,
+        clippy::indexing_slicing,
+        reason = "manual check"
+    )]
     fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
         let email_subjects = self
             .emails
@@ -128,15 +132,11 @@ impl Tui {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let subject_list_container = Block::bordered()
-            .title("Recent emails")
-            .border_type(BorderType::Rounded)
-            .title_alignment(Alignment::Center);
         let email_subject_list = List::new(email_subjects);
 
-        let email_finder = email_subject_list.block(subject_list_container);
+        let email_finder = email_subject_list.block(new_simple_box("Recent emails"));
 
-        let other = Block::bordered().title("Email display");
+        let email_render = new_simple_box("Email display");
 
         let layout =
             Layout::new(Direction::Horizontal, [Constraint::Fill(10), Constraint::Fill(10)])
@@ -147,7 +147,7 @@ impl Tui {
         }
 
         frame.render_widget(email_finder, layout[0]);
-        frame.render_widget(other, layout[1]);
+        frame.render_widget(email_render, layout[1]);
 
         Ok(())
     }
@@ -170,4 +170,11 @@ pub enum Error {
     LayoutFailure,
     /// Error occurred while spawning keyboard listener thread.
     UnknownKeyboard(Box<dyn Any + Send>),
+}
+
+fn new_simple_box(title: &str) -> Block<'_> {
+    Block::bordered()
+        .title(title)
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
 }
