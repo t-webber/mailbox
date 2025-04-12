@@ -7,12 +7,13 @@ use mail_parser::HeaderName;
 use ratatui::Frame;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, read};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, BorderType, List, ListItem};
 
 use crate::credentials::Credentials;
 use crate::errors::Result;
+use crate::fetch;
 use crate::fetch::connection::ImapSession;
 use crate::fetch::parser::{self, Email};
 
@@ -28,6 +29,10 @@ pub struct Tui {
     current_id: usize,
     /// Emails that were fetched from the server
     emails: Vec<Email>,
+    /// Id of the opened email
+    ///
+    /// This is the same id than `current_id`, so the same rules apply.
+    open_email_id: usize,
     /// Email uids that exist in the INBOX
     uids: Vec<u32>,
     /// Indicates whether the app is running
@@ -50,7 +55,7 @@ impl Tui {
             .map(|(uid, body)| Ok(Email::try_from((**uid, body.as_bytes()))?))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(Self { running: false, uids, emails: first_emails, current_id: 0 })
+        Ok(Self { running: false, uids, open_email_id: 0, emails: first_emails, current_id: 0 })
     }
 
     /// Runs the [`Tui`]
@@ -90,6 +95,9 @@ impl Tui {
             Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
                 self.current_id = self.current_id.saturating_sub(1)
             }
+            Event::Key(KeyEvent { code: KeyCode::Char('l'), .. }) => {
+                self.open_email_id = self.current_id;
+            }
             Event::Key(_)
             | Event::FocusGained
             | Event::FocusLost
@@ -107,6 +115,70 @@ impl Tui {
         reason = "manual check"
     )]
     fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
+        let layout =
+            Layout::new(Direction::Horizontal, [Constraint::Fill(10), Constraint::Fill(10)])
+                .split(Rect::new(0, 0, frame.area().width, frame.area().height));
+
+        if layout.len() != 2 {
+            return Err(Error::LayoutFailure.into());
+        }
+
+        let email = &self.emails[self.open_email_id];
+        frame.render_widget(self.get_email_explorer_widget()?, layout[0]);
+        frame.render_widget(Self::get_email_viewer_widget(email)?, layout[1]);
+
+        Ok(())
+    }
+
+    /// Creates the widget representing the email viewer
+    ///
+    /// This is the panel displaying the content of the selected email.
+    fn get_email_viewer_widget(email: &Email) -> Result<List<'_>> {
+        let subject_str = email
+            .as_headers()
+            .get(&HeaderName::Subject)
+            .map(|value| {
+                value
+                    .as_text()
+                    .map(|subject| subject.to_owned())
+                    .ok_or(fetch::parser::Error::InvalidHeaderType)
+            })
+            .unwrap_or_else(|| Ok("No subject".to_owned()))?;
+        let subject_txt = Text::from(subject_str);
+
+        let date_str = email
+            .as_headers()
+            .get(&HeaderName::Date)
+            .map(|value| {
+                value
+                    .as_datetime()
+                    .ok_or(fetch::parser::Error::InvalidHeaderType)
+                    .map(|date| date.to_rfc3339())
+            })
+            .unwrap_or_else(|| Ok("No date".to_owned()))?;
+        let date_txt = Text::from(date_str);
+
+        let from_str = email
+            .as_headers()
+            .get(&HeaderName::From)
+            .map(|value| {
+                value
+                    .as_address()
+                    .ok_or(fetch::parser::Error::InvalidHeaderType)
+                    .map(|address| format!("{address:?}"))
+            })
+            .unwrap_or_else(|| Ok("No from".to_owned()))?;
+        let from_txt = Text::from(from_str);
+
+        let email_view = List::new([subject_txt, date_txt, from_txt]);
+
+        Ok(email_view)
+    }
+
+    /// Creates the widget representing the email explorer
+    ///
+    /// This is left panel of the editor, giving the list of received emails and enabling the user to select an email to display.
+    fn get_email_explorer_widget(&self) -> Result<List<'_>> {
         let email_subjects = self
             .emails
             .iter()
@@ -132,24 +204,9 @@ impl Tui {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let email_subject_list = List::new(email_subjects);
+        let email_explorer = List::new(email_subjects).block(new_simple_box("Recent emails"));
 
-        let email_finder = email_subject_list.block(new_simple_box("Recent emails"));
-
-        let email_render = new_simple_box("Email display");
-
-        let layout =
-            Layout::new(Direction::Horizontal, [Constraint::Fill(10), Constraint::Fill(10)])
-                .split(Rect::new(0, 0, frame.area().width, frame.area().height));
-
-        if layout.len() != 2 {
-            return Err(Error::LayoutFailure.into());
-        }
-
-        frame.render_widget(email_finder, layout[0]);
-        frame.render_widget(email_render, layout[1]);
-
-        Ok(())
+        Ok(email_explorer)
     }
 }
 
