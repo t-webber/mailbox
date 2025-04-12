@@ -2,7 +2,6 @@
 
 use core::any::Any;
 use std::io;
-use std::sync::Arc;
 
 use mail_parser::HeaderName;
 use ratatui::Frame;
@@ -10,7 +9,7 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, read};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, BorderType, List, ListItem};
+use ratatui::widgets::{Block, BorderType, List, ListItem, Paragraph, Wrap};
 
 use crate::credentials::Credentials;
 use crate::errors::Result;
@@ -44,7 +43,8 @@ impl Tui {
     /// Creates a new [`Tui`]
     pub fn new() -> Result<Self> {
         let credentials = Credentials::load()?;
-        let mut session = ImapSession::with_credentials(&credentials)?.select_mailbox("INBOX")?;
+        let mut session = ImapSession::with_credentials(&credentials)?
+            .select_mailbox("INBOX")?;
         let uids = session.get_uids()?;
         let first_email_bodies = uids
             .iter()
@@ -56,7 +56,13 @@ impl Tui {
             .map(|(uid, body)| Ok(Email::try_from((**uid, body.as_bytes()))?))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(Self { running: false, uids, open_email_id: None, emails: first_emails, current_id: 0 })
+        Ok(Self {
+            running: false,
+            uids,
+            open_email_id: None,
+            emails: first_emails,
+            current_id: 0,
+        })
     }
 
     /// Runs the [`Tui`]
@@ -119,19 +125,27 @@ impl Tui {
     )]
     fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
         if let Some(open_email_id) = self.open_email_id {
-            let layout =
-                Layout::new(Direction::Horizontal, [Constraint::Fill(10), Constraint::Fill(10)])
-                    .split(Rect::new(0, 0, frame.area().width, frame.area().height));
+            let layout = Layout::new(
+                Direction::Horizontal,
+                [Constraint::Fill(1), Constraint::Fill(1)],
+            )
+            .split(Rect::new(
+                0,
+                0,
+                frame.area().width,
+                frame.area().height,
+            ));
 
             if layout.len() != 2 {
-                return Err(Error::LayoutFailure.into());
+                return Err(Error::LayoutLengthFailure.into());
             }
 
             let email = &self.emails[open_email_id];
             frame.render_widget(self.get_email_explorer_widget()?, layout[0]);
-            frame.render_widget(Self::get_email_viewer_widget(email)?, layout[1]);
+            Self::get_email_viewer_widget(frame, layout[1], email)?;
         } else {
-            frame.render_widget(self.get_email_explorer_widget()?, frame.area());
+            frame
+                .render_widget(self.get_email_explorer_widget()?, frame.area());
         }
         Ok(())
     }
@@ -139,17 +153,29 @@ impl Tui {
     /// Creates the widget representing the email viewer
     ///
     /// This is the panel displaying the content of the selected email.
-    fn get_email_viewer_widget(email: &Email) -> Result<List<'_>> {
-        let subject_str = email.as_headers().get(&HeaderName::Subject).map_or_else(
-            || Ok("No subject".to_owned()),
-            |value| {
-                value
-                    .as_text()
-                    .map(ToOwned::to_owned)
-                    .ok_or(fetch::parser::Error::InvalidHeaderType)
-            },
-        )?;
-        let subject_txt = Text::from(subject_str);
+    #[expect(
+        clippy::missing_asserts_for_indexing,
+        clippy::indexing_slicing,
+        reason = "manual check"
+    )]
+    fn get_email_viewer_widget(
+        frame: &mut Frame<'_>,
+        rect: Rect,
+        email: &Email,
+    ) -> Result {
+        let subject_str =
+            email.as_headers().get(&HeaderName::Subject).map_or_else(
+                || Ok("No subject".to_owned()),
+                |value| {
+                    value
+                        .as_text()
+                        .map(ToOwned::to_owned)
+                        .ok_or(fetch::parser::Error::InvalidHeaderType)
+                },
+            )?;
+        let subject_txt = Paragraph::new(Text::from(subject_str))
+            .wrap(Wrap { trim: false })
+            .block(Block::bordered());
 
         let date_str = email.as_headers().get(&HeaderName::Date).map_or_else(
             || Ok("No date".to_owned()),
@@ -160,7 +186,9 @@ impl Tui {
                     .map(mail_parser::DateTime::to_rfc3339)
             },
         )?;
-        let date_txt = Text::from(date_str);
+        let date_txt = Paragraph::new(Text::from(date_str))
+            .wrap(Wrap { trim: false })
+            .block(Block::bordered());
 
         let from_str = email.as_headers().get(&HeaderName::From).map_or_else(
             || Ok("No from".to_owned()),
@@ -171,11 +199,36 @@ impl Tui {
                     .map(|address| format!("{address:?}"))
             },
         )?;
-        let from_txt = Text::from(from_str);
+        let from_txt = Paragraph::new(Text::from(from_str))
+            .wrap(Wrap { trim: false })
+            .block(Block::bordered());
 
-        let email_view = List::new([subject_txt, date_txt, from_txt]);
+        let body_str = email.to_plain_body()?;
+        let body_txt =
+            Paragraph::new(Text::from(body_str)).wrap(Wrap { trim: false });
 
-        Ok(email_view)
+        let layout = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Max(5),
+                Constraint::Max(3),
+                Constraint::Max(5),
+                Constraint::Fill(1),
+            ],
+        )
+        .split(rect);
+
+        if layout.len() != 4 {
+            return Err(Error::LayoutLengthFailure.into());
+        }
+
+        frame.render_widget(subject_txt, layout[0]);
+        frame.render_widget(date_txt, layout[1]);
+        frame.render_widget(from_txt, layout[2]);
+        frame.render_widget(body_txt, layout[3]);
+        frame.render_widget(new_simple_box("Email viewer"), rect);
+
+        Ok(())
     }
 
     /// Creates the widget representing the email explorer
@@ -197,7 +250,8 @@ impl Tui {
                     .as_datetime()
                     .ok_or(parser::Error::InvalidHeaderType)?
                     .to_rfc3339();
-                let raw_text = Text::from(vec![Line::from(subject), Line::from(date)]);
+                let raw_text =
+                    Text::from(vec![Line::from(subject), Line::from(date)]);
                 let styled_text = if self.current_id == id {
                     raw_text.style(Style::new().bg(Color::Green))
                 } else {
@@ -207,7 +261,8 @@ impl Tui {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let email_explorer = List::new(email_subjects).block(new_simple_box("Recent emails"));
+        let email_explorer =
+            List::new(email_subjects).block(new_simple_box("Recent emails"));
 
         Ok(email_explorer)
     }
@@ -227,7 +282,7 @@ pub enum Error {
     /// Error occurred while reading the keyboard presses.
     IoKeyboard(io::Error),
     /// Failed to create the layout
-    LayoutFailure,
+    LayoutLengthFailure,
     /// Error occurred while spawning keyboard listener thread.
     UnknownKeyboard(Box<dyn Any + Send>),
 }

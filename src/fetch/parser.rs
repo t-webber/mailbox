@@ -32,8 +32,16 @@ impl Email {
         &self.headers
     }
 
+    /// Returns the body in plain text
+    pub fn to_plain_body(&self) -> Result<String> {
+        Ok(self.text.as_ref().ok_or(Error::NoBody)?.to_owned())
+    }
+
     /// Returns the value of a header
-    pub fn get_header(&self, header_name: &HeaderName<'_>) -> Result<HeaderValue<'_>> {
+    pub fn get_header(
+        &self,
+        header_name: &HeaderName<'_>,
+    ) -> Result<HeaderValue<'_>> {
         Ok(self
             .as_headers()
             .get(header_name)
@@ -56,7 +64,9 @@ impl<'body> TryFrom<(u32, &'body [u8])> for Email {
             .ok_or(Error::NoHeaders)?
             .headers
             .iter()
-            .map(|header| (header.name.to_owned(), header.value.clone().into_owned()))
+            .map(|header| {
+                (header.name.to_owned(), header.value.clone().into_owned())
+            })
             .collect();
 
         let html = message.body_html(0).map(|html| html.to_string());
@@ -77,6 +87,8 @@ pub enum Error {
     NoHeaders,
     /// Failed to get the wanted header
     MissingHeader,
+    /// Failed to get email body
+    NoBody,
 }
 
 #[cfg(test)]
@@ -85,7 +97,8 @@ mod test {
 
     use crate::fetch::parser::Email;
 
-    const EMAIL_EXAMPLES: &[u8] = br#"From: Art Vandelay <art@vandelay.com> (Vandelay Industries)
+    const EMAIL_EXAMPLES: &[u8] =
+        br#"From: Art Vandelay <art@vandelay.com> (Vandelay Industries)
 To: "Colleagues": "James Smythe" <james@vandelay.com>; Friends:
     jane@example.com, =?UTF-8?Q?John_Sm=C3=AEth?= <john@example.com>;
 Date: Sat, 20 Nov 2021 14:22:01 -0800
@@ -125,7 +138,7 @@ R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
 --giddyup--
 --festivus--
 "#
-    .as_slice();
+        .as_slice();
 
     #[test]
     #[expect(clippy::unwrap_used, clippy::non_ascii_literal, reason = "test")]
@@ -141,7 +154,10 @@ R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
                 .unwrap()
                 .first()
                 .unwrap(),
-            &Addr::new("Art Vandelay (Vandelay Industries)".into(), "art@vandelay.com")
+            &Addr::new(
+                "Art Vandelay (Vandelay Industries)".into(),
+                "art@vandelay.com"
+            )
         );
 
         assert_eq!(
@@ -155,7 +171,10 @@ R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
             &[
                 Group::new(
                     "Colleagues",
-                    vec![Addr::new("James Smythe".into(), "james@vandelay.com")]
+                    vec![Addr::new(
+                        "James Smythe".into(),
+                        "james@vandelay.com"
+                    )]
                 ),
                 Group::new(
                     "Friends",
