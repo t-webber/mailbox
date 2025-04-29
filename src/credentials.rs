@@ -18,7 +18,7 @@ use crate::errors::Result;
 /// Credentials to interact with the email.
 ///
 /// These credentials should be stored in the `.env` file.
-#[derive(Debug)]
+
 pub struct Credentials {
     /// Email domain
     domain_name: String,
@@ -81,10 +81,17 @@ impl Credentials {
         let domain_name = Self::load_var(Self::DOMAIN)?;
         let email = Self::load_var(Self::EMAIL)?;
         let imap_port = Self::load_imap_port()?;
-        let imap_encryption_protocol = Self::load_var(Self::IMAP_ENCRYPTION_PROTOCOL)?;
+        let imap_encryption_protocol =
+            Self::load_var(Self::IMAP_ENCRYPTION_PROTOCOL)?;
         let password = Self::load_var(Self::PASSWORD)?;
 
-        Ok(Self { domain_name, email, imap_encryption_protocol, imap_port, password })
+        Ok(Self {
+            domain_name,
+            email,
+            imap_encryption_protocol,
+            imap_port,
+            password,
+        })
     }
 
     /// Load the imap port from the `.env`

@@ -4,7 +4,7 @@
 //! [`mailbox`](crate) to read the emails.
 
 use core::marker::PhantomData;
-use core::str::{from_utf8, Utf8Error};
+use core::str::{Utf8Error, from_utf8};
 use std::net;
 
 use imap::types::Fetch;
@@ -48,7 +48,10 @@ pub struct ImapSession<T> {
 
 impl ImapSession<None> {
     /// Selects a mailbox to fetch
-    pub fn select_mailbox(mut self, mailbox_name: &str) -> Result<ImapSession<MailboxSelected>> {
+    pub fn select_mailbox(
+        mut self,
+        mailbox_name: &str,
+    ) -> Result<ImapSession<MailboxSelected>> {
         self.session
             .select(mailbox_name)
             .map_err(Error::InvalidMailboxName)?;
@@ -59,7 +62,8 @@ impl ImapSession<None> {
     pub fn with_credentials(credentials: &Credentials) -> Result<Self> {
         let socket_address = credentials.as_imap_socket_address();
         let domain_name = credentials.as_domain_name();
-        let ssl_connector = TlsConnector::new().map_err(Error::TlsConnection)?;
+        let ssl_connector =
+            TlsConnector::new().map_err(Error::TlsConnection)?;
 
         let client = imap::connect(socket_address, domain_name, &ssl_connector)
             .map_err(Error::ImapConnection)?;

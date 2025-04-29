@@ -206,7 +206,8 @@ R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
             "Why not both importing AND exporting? ☺"
         );
 
-        // HTML and text body parts are returned conforming to RFC8621, Section 4.1.4
+        // HTML and text body parts are returned conforming to RFC8621, Section
+        // 4.1.4
         assert_eq!(
             &email.html.unwrap(),
             "<html><p>I was thinking about quitting the &ldquo;exporting&rdquo; to focus just on the &ldquo;importing&rdquo;,</p><p>but then I thought, why not do both? &#x263A;</p></html>"

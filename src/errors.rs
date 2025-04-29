@@ -14,7 +14,7 @@ pub enum Error {
     /// Failure occurred while parsing the email body.
     Parsing(fetch::parser::Error),
     /// Failure occurred after TUI
-    Tui(tui::Error),
+    Tui(tui::app::Error),
 }
 
 impl From<credentials::Error> for Error {
@@ -35,8 +35,8 @@ impl From<fetch::parser::Error> for Error {
     }
 }
 
-impl From<tui::Error> for Error {
-    fn from(error: tui::Error) -> Self {
+impl From<tui::app::Error> for Error {
+    fn from(error: tui::app::Error) -> Self {
         Self::Tui(error)
     }
 }

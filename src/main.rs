@@ -24,7 +24,10 @@
     clippy::restriction,
     clippy::nursery
 )]
-#![expect(clippy::blanket_clippy_restriction_lints, reason = "enable all lints")]
+#![expect(
+    clippy::blanket_clippy_restriction_lints,
+    reason = "enable all lints"
+)]
 #![expect(
     clippy::single_call_fn,
     clippy::implicit_return,
@@ -42,5 +45,5 @@ mod fetch;
 mod tui;
 
 fn main() -> errors::Result {
-    tui::Tui::new()?.run()
+    tui::app::Tui::new()?.run()
 }
