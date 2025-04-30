@@ -4,3 +4,4 @@ pub mod app;
 mod components;
 mod manual;
 mod states;
+mod writer;

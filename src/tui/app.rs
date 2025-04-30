@@ -6,11 +6,12 @@ use std::io;
 use mail_parser::HeaderName;
 use ratatui::Frame;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, read};
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, BorderType, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{Block, List, ListItem, Paragraph, Wrap};
 
+use super::components::new_simple_box;
 use super::manual::manual_page;
 use super::states::TuiMode;
 use crate::credentials::Credentials;
@@ -81,7 +82,7 @@ impl Tui {
             terminal
                 .draw(|frame| self.draw_tui(frame).unwrap())
                 .map_err(Error::Drawing)?;
-            self.key_events()?;
+            self.handle_key_events()?;
         }
         ratatui::restore();
         Ok(())
@@ -91,33 +92,43 @@ impl Tui {
     ///
     /// This function is called every loop to re-render the TUI.
     pub fn draw_tui(&mut self, frame: &mut Frame<'_>) -> Result {
-        match self.mode {
-            TuiMode::Help => Ok(manual_page(frame)),
-            TuiMode::Reading => self.draw_writer(frame),
-            TuiMode::Writing => self.draw_emails(frame),
+        match &mut self.mode {
+            TuiMode::Help => {
+                manual_page(frame);
+                Ok(())
+            }
+            TuiMode::Writing(writer) => {
+                writer.writer_page(frame);
+                Ok(())
+            }
+            TuiMode::Reading => self.draw_emails(frame),
         }
     }
 
-    /// Email writer, to send emails
-    pub fn draw_writer(&mut self, frame: &mut Frame<'_>) -> Result {
-        Ok(())
-    }
-
     /// Handles key events
-    fn key_events(&mut self) -> Result {
-        match read().map_err(Error::IoKeyboard)? {
+    fn handle_key_events(&mut self) -> Result {
+        let event = read().map_err(Error::IoKeyboard)?;
+        if let TuiMode::Writing(writer) = &mut self.mode
+            && writer.handle_key_events(&event)
+        {
+            return Ok(());
+        }
+        match event {
             Event::Key(KeyEvent { code: KeyCode::Char(ch), .. }) => match ch {
                 'q' => self.running = false,
-                'j' => {
+                'j' if matches!(self.mode, TuiMode::Reading) => {
                     let incremented = self.current_id.saturating_add(1);
                     if incremented < self.emails.len() {
                         self.current_id = incremented;
                     }
                 }
-                'k' => self.current_id = self.current_id.saturating_sub(1),
-                'l' => self.open_email_id = Some(self.current_id),
-                'h' => self.open_email_id = None,
-                'w' => self.mode = TuiMode::Writing,
+                'k' if matches!(self.mode, TuiMode::Reading) =>
+                    self.current_id = self.current_id.saturating_sub(1),
+                'l' if matches!(self.mode, TuiMode::Reading) =>
+                    self.open_email_id = Some(self.current_id),
+                'h' if matches!(self.mode, TuiMode::Reading) =>
+                    self.open_email_id = None,
+                'w' => self.mode.new_writer(),
                 'r' => self.mode = TuiMode::Reading,
                 'm' => self.mode = TuiMode::Help,
                 _ => (),
@@ -139,7 +150,6 @@ impl Tui {
         reason = "manual check"
     )]
     fn draw_emails(&self, frame: &mut Frame<'_>) -> Result {
-        let x = true;
         if let Some(open_email_id) = self.open_email_id {
             let layout = Layout::new(
                 Direction::Horizontal,
@@ -302,11 +312,4 @@ pub enum Error {
     LayoutLengthFailure,
     /// Error occurred while spawning keyboard listener thread.
     UnknownKeyboard(Box<dyn Any + Send>),
-}
-
-fn new_simple_box(title: &str) -> Block<'_> {
-    Block::bordered()
-        .title(title)
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
 }
